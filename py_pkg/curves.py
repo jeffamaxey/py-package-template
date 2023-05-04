@@ -48,11 +48,12 @@ class SupplyCurve:
         self._min_price = self._price.min()
 
     def __eq__(self, other) -> bool:
-        if (np.all(self._price == other._price)
-                and np.all(self._quantity == other._quantity)):
-            return True
-        else:
-            return False
+        return bool(
+            (
+                np.all(self._price == other._price)
+                and np.all(self._quantity == other._quantity)
+            )
+        )
 
     def quantity(self, price: float) -> float:
         """Return supply quantity for a given price.
@@ -63,11 +64,11 @@ class SupplyCurve:
         :rtype: float
         """
 
-        if price < self._min_price:
-            quantity_at_price = 0.
-        else:
-            quantity_at_price = self._quantity[self._price <= price][-1]
-        return quantity_at_price
+        return (
+            0.0
+            if price < self._min_price
+            else self._quantity[self._price <= price][-1]
+        )
 
 
 class DemandCurve:
@@ -101,11 +102,12 @@ class DemandCurve:
         self._max_price = self._price.max()
 
     def __eq__(self, other) -> bool:
-        if (np.all(self._price == other._price)
-                and np.all(self._quantity == other._quantity)):
-            return True
-        else:
-            return False
+        return bool(
+            (
+                np.all(self._price == other._price)
+                and np.all(self._quantity == other._quantity)
+            )
+        )
 
     def quantity(self, price: float) -> float:
         """Return demand quantity for a given price.
@@ -116,11 +118,11 @@ class DemandCurve:
         :rtype: float
         """
 
-        if price > self._max_price:
-            quantity_at_price = 0.
-        else:
-            quantity_at_price = self._quantity[self._price >= price][0]
-        return quantity_at_price
+        return (
+            0.0
+            if price > self._max_price
+            else self._quantity[self._price >= price][0]
+        )
 
 
 class SupplyMonotonicityError(Exception):
@@ -188,24 +190,21 @@ def equil_price_ranges(s: SupplyCurve, d: DemandCurve) -> PriceRanges:
     """
 
     price_domain = np.unique(np.hstack([np.zeros(1), s._price, d._price]))
-    equilibrium = equil_price(s, d)
-    if equilibrium:
-        prices_below_equil = price_domain[price_domain < equilibrium]
-        if len(prices_below_equil) > 0:
-            supply_range = (prices_below_equil[-1], equilibrium)
-        else:
-            supply_range = (None, equilibrium)
-
-        prices_above_equil = price_domain[price_domain > equilibrium]
-        if len(prices_above_equil) > 0:
-            demand_range = (equilibrium, prices_above_equil[0])
-        else:
-            demand_range = (equilibrium, None)
-
-        return PriceRanges(supply_range, demand_range)
-
-    else:
+    if not (equilibrium := equil_price(s, d)):
         return PriceRanges((None, None), (None, None))
+    prices_below_equil = price_domain[price_domain < equilibrium]
+    supply_range = (
+        (prices_below_equil[-1], equilibrium)
+        if len(prices_below_equil) > 0
+        else (None, equilibrium)
+    )
+    prices_above_equil = price_domain[price_domain > equilibrium]
+    if len(prices_above_equil) > 0:
+        demand_range = (equilibrium, prices_above_equil[0])
+    else:
+        demand_range = (equilibrium, None)
+
+    return PriceRanges(supply_range, demand_range)
 
 
 Curve = TypeVar('Curve', SupplyCurve, DemandCurve)
@@ -240,13 +239,11 @@ class Equilibrium:
         self.demand_q = demand_curve.quantity(eq_price) if eq_price else None
 
     def __eq__(self, other) -> bool:
-        criteria = ((self.price == other.price)
-                    and (self.supply_q == other.supply_q)
-                    and (self.demand_q == other.demand_q))
-        if criteria:
-            return True
-        else:
-            return False
+        return (
+            (self.price == other.price)
+            and (self.supply_q == other.supply_q)
+            and (self.demand_q == other.demand_q)
+        )
 
 
 class EconShockScenario(metaclass=abc.ABCMeta):
